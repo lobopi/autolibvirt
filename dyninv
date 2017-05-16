@@ -1,0 +1,57 @@
+#!/bin/bash
+# ram0353
+# martinez.sanchez@gmail.com
+
+SYS=${1}
+VM=${2}
+MASTERs=${3}
+NODEs=${4}
+SYSIDs=$(virsh -c qemu+ssh://root@${SYS}/system list | egrep -v 'Id|----' | grep running | awk '{print $1":"$2}' | grep  ${VM})
+N_ARRAY=()
+
+
+
+for IDs in ${SYSIDs}
+do
+  ID=$(echo ${IDs} | cut -d':' -f1)
+  NAME=$(echo ${IDs} | cut -d':' -f2)
+  MAC=$(virsh -c qemu+ssh://root@${SYS}/system dumpxml ${ID} | grep -i "mac address" | cut -d'=' -f2 | cut -d"'" -f2)
+  IPs=$(virsh -c qemu+ssh://root@${SYS}/system net-dhcp-leases --network default ${MAC} | egrep -vi "expiry|---" | awk '{print $5}')
+  IPs=$(echo ${IPs} | sed 's/\/24//g')
+  N_ARRAY+=($(echo ${IPs}))
+done
+
+
+echo "[masters]"
+for master in $(seq ${MASTERs})
+do
+  echo  "ivpcoe-master${master} \
+ansible_ssh_host=${N_ARRAY[${master}-1]} \
+openshift_ip=${N_ARRAY[${master}-1]} \
+openshift_public_ip=${N_ARRAY[${master}-1]} \
+openshift_public_hostname=ivpcoe-master${master} \
+openshift_hostname=ivpcoe-master${master}"
+
+done
+
+
+echo "[minions]"
+n=1
+for node in  $(seq ${MASTERs} $((${NODEs}+${MASTERs}-1)))
+do
+  echo "ivpcoe-node${n} ansible_ssh_host=${N_ARRAY[${node}]} \
+openshift_ip=${N_ARRAY[${node}]} \
+openshift_public_ip=${N_ARRAY[${node}]} \
+openshift_public_hostname=ivpcoe-node${n} \
+openshift_hostname=ivpcoe-node${n} \
+openshift_node_labels=\"{'region': 'infra'}\""
+
+  n=$((n+1))
+done
+
+echo "[lb]"
+echo "ivpcoe-lb1 ansible_ssh_host=${N_ARRAY[-1]} \
+openshift_ip=${N_ARRAY[-1]} \
+openshift_public_ip=${N_ARRAY[-1]} \
+openshift_public_hostname=ivpcoe-lb1 \
+openshift_hostname=ivpcoe-lb1"

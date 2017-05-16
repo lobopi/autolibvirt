@@ -1,0 +1,18 @@
+#!/bin/sh
+# ram0353
+# martinez.sanchez@gmail.com
+
+SYS=${1}
+
+SYSIDs=$(virsh -c qemu+ssh://root@${SYS}/system list | egrep -v 'Id|----' | grep running | awk '{print $1":"$2}')
+
+for IDs in ${SYSIDs}
+do
+  ID=$(echo ${IDs} | cut -d':' -f1)
+  NAME=$(echo ${IDs} | cut -d':' -f2)
+  MAC=$(virsh -c qemu+ssh://root@${SYS}/system dumpxml ${ID} | grep -i "mac address" | cut -d'=' -f2 | cut -d"'" -f2)
+  IPs=$(virsh -c qemu+ssh://root@${SYS}/system net-dhcp-leases --network default ${MAC} | egrep -vi "expiry|---" | awk '{print $5}')
+  echo ${NAME} ${MAC} ${IPs}
+done
+
+

@@ -1,0 +1,21 @@
+#!/bin/sh
+# ram0353
+# martinez.sanchez@gmail.com
+# 
+
+SYS=${1}
+VM=${2}
+POOL=${3}
+NO_VMs=${4}
+
+for pepe in $(seq ${NO_VMs})
+do
+  virsh --connect qemu+ssh://root@${SYS}/system \
+  destroy  ${VM}-${pepe}; \
+  virsh --connect qemu+ssh://root@${SYS}/system \
+  undefine  ${VM}-${pepe} && \
+  virsh --connect qemu+ssh://root@${SYS}/system \
+  vol-delete --pool ${POOL} ${VM}-${pepe}-os.img &&\
+  virsh --connect qemu+ssh://root@${SYS}/system \
+  vol-delete --pool ${POOL} ${VM}-${pepe}-extra.img
+done

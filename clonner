@@ -1,0 +1,38 @@
+#!/bin/sh
+# ram0353
+# martinez.sanchez@gmail.com
+# 
+
+SYS=${1}
+VM=${2}
+CLONE=${3}
+NO_VMS=${4}
+
+# STO_PATH=/home/raumarti/public_html/VMs
+
+STO_PATH=/home/raumarti/VMs
+
+for pepe in $(seq ${NO_VMS})
+do
+  virt-clone --connect qemu+ssh://root@${SYS}/system \
+  --original ${VM} \
+  --name ${CLONE}-${pepe} \
+  --file ${STO_PATH}/${CLONE}-${pepe}-os.img \
+  --file ${STO_PATH}/${CLONE}-${pepe}-extra.img && \
+  virsh -c qemu+ssh://root@${SYS}/system \
+  start ${CLONE}-${pepe}
+done
+echo "Waiting for VMs to get IPs"
+sleep 25
+
+SYSIDs=$(virsh -c qemu+ssh://root@${SYS}/system list | egrep -v 'Id|----' | grep running | awk '{print $1":"$2}')
+
+for IDs in ${SYSIDs}
+do
+  ID=$(echo ${IDs} | cut -d':' -f1)
+  NAME=$(echo ${IDs} | cut -d':' -f2)
+  MAC=$(virsh -c qemu+ssh://root@${SYS}/system dumpxml ${ID} | grep -i "mac address" | cut -d'=' -f2 | cut -d"'" -f2)
+  IPs=$(virsh -c qemu+ssh://root@${SYS}/system net-dhcp-leases --network default ${MAC} | egrep -vi "expiry|---" | awk '{print $5}')
+  echo ${NAME} ${MAC} ${IPs} | grep ${CLONE}
+done
+
